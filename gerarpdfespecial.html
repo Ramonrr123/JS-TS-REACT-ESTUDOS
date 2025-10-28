@@ -1,0 +1,263 @@
+Sub GerarPDFEspecial()
+
+    Dim ws As Worksheet
+    Set ws = Sheets("Calculo Orcamento Especial")
+    
+    ' Seleciona a planilha "Calculo Orcamento Especial"
+    ws.Select
+    
+    ' Exibe apenas as linhas com conteúdo (de 15 a 101)
+    ' Primeiro oculta todas as linhas
+    Rows("15:101").Select
+    Selection.EntireRow.Hidden = True
+    
+    ' Exibe as colunas que serão usadas (expandido para incluir todos os campos necessários)
+    Columns("A:K").EntireColumn.Hidden = False
+    Columns("L:AF").EntireColumn.Hidden = False
+    Columns("AJ:AP").EntireColumn.Hidden = False
+    Columns("AV:BN").EntireColumn.Hidden = False
+    
+    ' Exibe apenas as linhas que têm conteúdo real (mais restritivo)
+    Dim linhaComConteudo As Long
+    For linhaComConteudo = 15 To 101
+        ' Verifica se a linha tem conteúdo significativo nas colunas principais (incluindo todos os campos)
+        If Not IsEmpty(ws.Range("A" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("B" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("C" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("D" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("E" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("F" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("G" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("H" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("I" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("J" & linhaComConteudo).Value) Or _
+           Not IsEmpty(ws.Range("K" & linhaComConteudo).Value) Then
+            ws.Rows(linhaComConteudo).Hidden = False
+        End If
+    Next linhaComConteudo
+    
+    ' Garante que as linhas do cabeçalho (1-14) sempre fiquem visíveis
+    Rows("1:14").Select
+    Selection.EntireRow.Hidden = False
+    
+    ' Ajusta automaticamente a altura das linhas que têm conteúdo
+    Rows("15:101").AutoFit
+    
+    ' Declara variáveis para controle do PDF e visibilidade das linhas
+    Dim ultimaCelula As Range
+    Dim primeiraCelulaPreenchida As Range
+    Dim intervaloOcultar As Range
+    Dim podeOcultar As Boolean
+    
+    podeOcultar = True
+    Set ultimaCelula = ws.Range("C100")
+    
+    ' Verifica se a última célula da coluna C não está vazia. Se não estiver, não pode ocultar linhas.
+    If Not IsEmpty(ultimaCelula.Value) Then
+        podeOcultar = False
+    End If
+    
+    ' Encontra a primeira célula preenchida, indo de baixo para cima
+    Set primeiraCelulaPreenchida = ultimaCelula.End(xlUp)
+    
+    ' Se a primeira célula preenchida estiver na linha 14 ou acima, não pode ocultar linhas
+    If primeiraCelulaPreenchida.Row <= 14 Then
+        podeOcultar = False
+    End If
+    
+    ' Se a primeira célula preenchida for exatamente a linha 14, também não oculta linhas
+    If primeiraCelulaPreenchida.Row = 14 Then
+        podeOcultar = False
+    End If
+    
+    ' Se for possível ocultar, oculta as linhas a partir da primeira célula preenchida até a última célula
+    If podeOcultar Then
+        Set intervaloOcultar = ws.Range(primeiraCelulaPreenchida.Offset(1, 0), ultimaCelula)
+        intervaloOcultar.EntireRow.Hidden = True
+    End If
+    
+    ' Define a área de impressão para incluir todos os campos necessários
+    ' Área expandida para mostrar todos os campos: Categoria, Subcategoria, Descrição, Quantidade, etc.
+    ws.PageSetup.PrintArea = "A1:K120"
+    
+    ' Define número de páginas a partir da célula AJ6
+    Dim paginasDesejadas As Integer
+    paginasDesejadas = 1
+    If IsNumeric(ws.Range("AJ6").Value) Then
+        If ws.Range("AJ6").Value >= 1 Then
+            paginasDesejadas = ws.Range("AJ6").Value
+        End If
+    End If
+    
+    ' Garante que o número de páginas seja sempre válido (mínimo 1)
+    If paginasDesejadas < 1 Then paginasDesejadas = 1
+    
+    ' Configurações da página para formato VERTICAL (retrato) - similar ao documento de exemplo
+    With ws.PageSetup
+        .Orientation = xlPortrait          ' MUDANÇA: Orientação vertical (retrato)
+        .PaperSize = xlPaperA4             ' Papel A4
+        .Zoom = False                      ' Desabilita zoom automático
+        .FitToPagesWide = 1               ' Uma página de largura
+        .FitToPagesTall = paginasDesejadas ' CORRIGIDO: Usa o número de páginas desejadas
+        .PrintTitleRows = "$14:$14"       ' Garante que o título imprima em todas as páginas
+        
+        ' Configurações de margens para evitar cortes e manter layout adequado
+        .LeftMargin = Application.InchesToPoints(0.3)     ' Margem esquerda: 0.3" (adequada)
+        .RightMargin = Application.InchesToPoints(0.3)    ' Margem direita: 0.3" (adequada)
+        .TopMargin = Application.InchesToPoints(0.4)      ' Margem superior: 0.4" (adequada)
+        .BottomMargin = Application.InchesToPoints(0.3)   ' Margem inferior: 0.3" (adequada)
+        .HeaderMargin = Application.InchesToPoints(0.2)   ' Margem do cabeçalho: 0.2"
+        .FooterMargin = Application.InchesToPoints(0.2)   ' Margem do rodapé: 0.2"
+        
+        ' Centralização e formatação
+        .CenterHorizontally = True        ' Centraliza horizontalmente
+        .CenterVertically = False         ' Não centraliza verticalmente
+        .PrintGridlines = False           ' Não imprime linhas da grade
+        .PrintHeadings = False            ' Não imprime cabeçalhos de linha/coluna
+        .PrintQuality = 600               ' Qualidade de impressão alta
+    End With
+    
+    ' Quebras de página dinâmicas - só quebra se realmente necessário
+    ' Verifica se há conteúdo suficiente para justificar múltiplas páginas
+    Dim ultimaLinhaComConteudo As Long
+    ultimaLinhaComConteudo = 0
+    
+    ' Encontra a última linha com conteúdo nas colunas principais (incluindo todos os campos)
+    For iLinha = 15 To 120
+        If Not ws.Range("A" & iLinha & ":K" & iLinha).EntireRow.Hidden Then
+            If Not IsEmpty(ws.Range("A" & iLinha).Value) Or Not IsEmpty(ws.Range("C" & iLinha).Value) Then
+                ultimaLinhaComConteudo = iLinha
+            End If
+        End If
+    Next iLinha
+    
+    ' Só aplica quebras se há muito conteúdo (mais de 40 linhas de produtos)
+    If paginasDesejadas > 1 And ultimaLinhaComConteudo > 55 Then
+        ws.ResetAllPageBreaks
+        
+        ' Altura imprimível da página em pontos - CONSERVADOR para evitar quebras desnecessárias
+        Dim alturaImprimivelPts As Double
+        alturaImprimivelPts = 850 ' Conservador para manter informações comerciais juntas
+        
+        Dim alturaAcumulada As Double
+        Dim linhaAtual As Long
+        Dim numQuebras As Integer
+        Dim linhasQuebradas() As Long
+        ReDim linhasQuebradas(1 To paginasDesejadas - 1)
+        
+        Dim alturaCabecalho As Double
+        alturaCabecalho = 0
+        
+        ' Soma altura das linhas 1 a 14 (cabeçalho + informações comerciais)
+        ' Estas linhas SEMPRE ficam na primeira página
+        For iLinha = 1 To 14
+            If Not ws.Rows(iLinha).Hidden Then
+                alturaCabecalho = alturaCabecalho + ws.Rows(iLinha).RowHeight
+            End If
+        Next iLinha
+        
+        ' Inicia o cálculo das quebras a partir da linha 15 (produtos)
+        alturaAcumulada = alturaCabecalho
+        linhaAtual = 15
+        numQuebras = 0
+        
+        Do While linhaAtual <= 120 And numQuebras < paginasDesejadas - 1
+            If Not ws.Rows(linhaAtual).Hidden Then
+                alturaAcumulada = alturaAcumulada + ws.Rows(linhaAtual).RowHeight
+            End If
+            
+            If alturaAcumulada > alturaImprimivelPts Then
+                linhasQuebradas(numQuebras + 1) = linhaAtual - 1
+                numQuebras = numQuebras + 1
+                ' Reinicia apenas com a linha atual (sem repetir cabeçalho)
+                alturaAcumulada = ws.Rows(linhaAtual).RowHeight
+            End If
+            
+            linhaAtual = linhaAtual + 1
+        Loop
+        
+        If numQuebras > 0 Then
+            If linhasQuebradas(numQuebras) >= 120 Then
+                numQuebras = numQuebras - 1
+            End If
+        End If
+        
+        ws.ResetAllPageBreaks
+        
+        Dim q As Integer
+        For q = 1 To numQuebras
+            ws.HPageBreaks.Add Before:=ws.Rows(linhasQuebradas(q) + 1)
+        Next q
+    Else
+        ' Se for 1 página ou vazio, área de impressão sem quebras
+        ws.ResetAllPageBreaks
+        ws.PageSetup.PrintArea = "A1:K120"
+    End If
+    
+    ' Reoculta colunas após definir área de impressão
+    ' Mantém visíveis as colunas A até K (incluindo todos os campos necessários)
+    Columns("L:AF").EntireColumn.Hidden = True
+    Columns("AJ:AP").EntireColumn.Hidden = True
+    Columns("AV:BN").EntireColumn.Hidden = True
+    
+    ' Seleção das abas para exportação
+    ThisWorkbook.Sheets(Array("Calculo Orcamento Especial", "Informacoes Adicionais PDF")).Select
+    
+    ' Validação de nome de arquivo
+    Dim nomeArquivo As String
+    Dim nomeCliente As String
+    Dim nomeProposta As String
+    
+    nomeCliente = ws.Range("D5").Value
+    nomeProposta = ws.Range("AJ10").Value
+    
+    Dim caracteresInvalidos As String
+    Dim i As Integer
+    Dim caractere As String
+    caracteresInvalidos = "\/:*?""<>|"
+    
+    For i = 1 To Len(caracteresInvalidos)
+        caractere = Mid(caracteresInvalidos, i, 1)
+        If InStr(nomeCliente, caractere) > 0 Or InStr(nomeProposta, caractere) > 0 Then
+            ' Restaura visibilidade da planilha
+            ws.Select
+            Rows("15:101").Select
+            Selection.EntireRow.Hidden = False
+            Columns("L:AF").EntireColumn.Hidden = False
+            Columns("AJ:AP").EntireColumn.Hidden = False
+            Columns("AV:BN").EntireColumn.Hidden = False
+            Range("A14").Select
+            Range("C15").Select
+            MsgBox "Nome contém caracteres inválidos: '" & caractere & "'", vbExclamation
+            Exit Sub
+        End If
+    Next i
+    
+    ' Cria o nome do arquivo PDF com base na data, hora e informações do cliente e proposta
+    nomeArquivo = ThisWorkbook.Path & "/" & _
+                 Format(Date, "yyyymmdd") & " - " & _
+                 Format(Time, "HH") & "h" & _
+                 Format(Time, "nn") & "m - Orçamento " & _
+                 nomeProposta & " - " & _
+                 nomeCliente & ".pdf"
+    
+    ' Exporta as planilhas selecionadas como PDF com configurações otimizadas
+    ActiveSheet.ExportAsFixedFormat _
+        Type:=xlTypePDF, _
+        FileName:=nomeArquivo, _
+        Quality:=xlQualityStandard, _
+        IncludeDocProperties:=True, _
+        IgnorePrintAreas:=False, _
+        OpenAfterPublish:=True
+    
+    ' Restaura visibilidade após exportação
+    ws.Select
+    Rows("15:101").Select
+    Selection.EntireRow.Hidden = False
+    Columns("L:AF").EntireColumn.Hidden = False
+    Columns("AJ:AP").EntireColumn.Hidden = False
+    Columns("AV:BN").EntireColumn.Hidden = False
+    Range("A14").Select
+    Range("C15").Select
+
+End Sub
